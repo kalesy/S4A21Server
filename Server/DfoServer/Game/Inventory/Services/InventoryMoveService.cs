@@ -955,12 +955,24 @@ namespace DfoServer.Game.Inventory
             ItemCore previousItemAtSlot,
             Func<int, bool> cloneAvatarResolver = null)
         {
-            if (inventory == null || item == null || item.ItemKind != ItemCore.KindAvatar || item.AvatarUid <= 0)
+            if (inventory == null || item == null || item.ItemKind != ItemCore.KindAvatar)
                 return;
 
             var detail = inventory.AvatarDetails.GetDetail(item.AvatarUid);
             if (detail == null)
-                return;
+            {
+                var hadUid = item.AvatarUid > 0;
+                detail = inventory.AvatarDetails.CreateDetail(
+                    item,
+                    inventory.AccountId,
+                    inventory.CharacterId,
+                    persistImmediately: false);
+                if (detail == null)
+                    return;
+
+                if (!hadUid)
+                    inventory.MarkDirty(listType, slotIndex);
+            }
 
             cloneAvatarResolver = cloneAvatarResolver ?? ItemMetadataResolver.IsCloneAvatarItem;
             var isCloneAvatar = cloneAvatarResolver(item.ItemId);

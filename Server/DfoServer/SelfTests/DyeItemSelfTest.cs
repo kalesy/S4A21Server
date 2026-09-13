@@ -24,6 +24,7 @@ namespace DfoServer.SelfTests
             VerifyUseDyeRecordsCooltime(ref failures);
             VerifyUseDyeRejectsInvalidItems(ref failures);
             VerifyCloneAvatarCopiesDyeWhenEquipped(ref failures);
+            VerifyCloneAvatarSelfHealsMissingDetail(ref failures);
             VerifyAuroraLookReplaceDoesNotBorrowAppearance(ref failures);
 
             Console.WriteLine(failures == 0
@@ -392,6 +393,32 @@ namespace DfoServer.SelfTests
                 && cloneDetail.ClearAvatarId == 0
                 && cloneDetail.Color1 == 0
                 && cloneDetail.Color2 == 0,
+                ref failures);
+        }
+
+        private static void VerifyCloneAvatarSelfHealsMissingDetail(ref int failures)
+        {
+            var inventory = CreateInventory();
+            var baseAvatar = CreateAvatar(itemId: 310001, avatarUid: 9101);
+            var cloneAvatar = CreateAvatar(itemId: 310002, avatarUid: 9102);
+            inventory.AvatarDetails.Attach(CreateAvatarDetail(inventory, baseAvatar, color1: 24, color2: 7));
+
+            InventoryMoveService.SyncAvatarClearAvatarId(
+                inventory,
+                cloneAvatar,
+                InventoryListType.Equipment,
+                (short)EquipmentType.HatAvatar,
+                baseAvatar,
+                itemId => itemId == 310002);
+
+            var cloneDetail = inventory.AvatarDetails.GetDetail(9102);
+            Check(
+                "clone avatar self-heals a missing detail row and copies clear avatar/colors",
+                cloneDetail != null
+                && cloneDetail.ClearAvatarId == 310001
+                && cloneDetail.Color1 == 24
+                && cloneDetail.Color2 == 7
+                && inventory.AvatarDetails.DirtyDetailUids.Contains(9102),
                 ref failures);
         }
 
