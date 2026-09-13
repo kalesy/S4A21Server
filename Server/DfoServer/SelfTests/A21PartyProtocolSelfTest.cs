@@ -47,33 +47,31 @@ namespace DfoServer.SelfTests
             });
 
             var body = PartyInfoNotiBuilder.Build(party, 0);
-            Check("zero-info0 type-0 body is 65 bytes", body.Length == 65, ref failures);
+            Check("zero-info0 type-0 body is 60 bytes", body.Length == 60, ref failures);
             Check(
-                "zero info0 keeps the conditional empty dstr before info1",
+                "zero info0 keeps the conditional empty dstr before the six fixed bytes",
                 body[5] == 0x00
                 && BitConverter.ToUInt32(body, 6) == 0
                 && body[10] == 0x02
                 && body[11] == 0x04
-                && body[16] == 0x05
-                && body[19] == 0xFF
-                && body[20] == 0xFF,
+                && body[15] == 0x00,
                 ref failures);
             Check(
-                "eight five-byte roster slots follow the zero-info0 settings",
-                BitConverter.ToUInt16(body, 21) == 10038
-                && BitConverter.ToUInt16(body, 26) == 0xFFFF
-                && BitConverter.ToUInt16(body, 56) == 0xFFFF,
+                "eight five-byte roster slots follow the eleven-byte info block",
+                BitConverter.ToUInt16(body, 16) == 10038
+                && BitConverter.ToUInt16(body, 21) == 0xFFFF
+                && BitConverter.ToUInt16(body, 51) == 0xFFFF,
                 ref failures);
             Check(
                 "roster tail and hasExtra are zero at A21 type-0 offsets",
-                body[61] == 0
-                && body[62] == 0
-                && body[63] == 0
-                && body[64] == 0,
+                body[56] == 0
+                && body[57] == 0
+                && body[58] == 0
+                && body[59] == 0,
                 ref failures);
             Check(
                 "other PARTY_INFO variants keep their parser-defined widths",
-                PartyInfoNotiBuilder.Build(party, 1).Length == 22
+                PartyInfoNotiBuilder.Build(party, 1).Length == 17
                 && PartyInfoNotiBuilder.Build(party, 2).Length == 49
                 && PartyInfoNotiBuilder.Build(party, 3).Length == 5
                     && PartyInfoNotiBuilder.Build(party, 5).Length == 6,
@@ -687,20 +685,17 @@ namespace DfoServer.SelfTests
             party.PartyInfoBlock = originalPartyInfoBlock;
             Check(
                 "nonzero info0 skips the conditional dstr in settings-only and full projections",
-                editProjection.Length == 18
+                editProjection.Length == 13
                 && editProjection[5] == 0x01
                 && editProjection[6] == 0x00
                 && editProjection[7] == 0x04
-                && editProjection[15] == 0x01
-                && editProjection[16] == 0x00
-                && editProjection[17] == 0x00
-                && namedFullProjection.Length == 61
+                && namedFullProjection.Length == 56
                 && namedFullProjection[5] == 0x01
                 && namedFullProjection[6] == 0x00
                 && namedFullProjection[7] == 0x04
-                && BitConverter.ToUInt16(namedFullProjection, 17) == 10038
-                && namedFullProjection[58] == 0
-                && namedFullProjection[60] == 0,
+                && BitConverter.ToUInt16(namedFullProjection, 12) == 10038
+                && namedFullProjection[52] == 0
+                && namedFullProjection[55] == 0,
                 ref failures);
             Check(
                 "party follower projection keeps ENTER_SELECT response type 0x000F",
@@ -1283,7 +1278,7 @@ namespace DfoServer.SelfTests
                 ref failures);
             Check(
                 "formation uses the client-proven full type 0 roster for every recipient",
-                PartyInfoNotiBuilder.Build(party, 0).Length == 65,
+                PartyInfoNotiBuilder.Build(party, 0).Length == 60,
                 ref failures);
             var returnProjection =
                 TownHandler.BuildTownReturnPartyProjectionPackets(party);
@@ -1354,7 +1349,7 @@ namespace DfoServer.SelfTests
                 && BitConverter.ToUInt16(transferPackets[1], 1) == 0x0009
                 && transferPackets[1][19] == 2
                 && transferPackets[1][61] == 1
-                && PartyInfoNotiBuilder.Build(transferred, 0)[62] == 1
+                && PartyInfoNotiBuilder.Build(transferred, 0)[57] == 1
                 && PartyInfoNotiBuilder.Build(transferred, 2)[46] == 1
                 && DungeonEntryHandler.ShouldRejectPartySelectionRequest(
                     transferred,
@@ -1480,7 +1475,7 @@ namespace DfoServer.SelfTests
                 && sparseSurvivors.LeaderUserId == 12103
                 && sparseSurvivors.GetMember(12103).SlotIndex == 2
                 && sparseSurvivors.GetMember(12104).SlotIndex == 3
-                && PartyInfoNotiBuilder.Build(sparseSurvivors, 0)[62] == 2
+                && PartyInfoNotiBuilder.Build(sparseSurvivors, 0)[57] == 2
                 && PartyInfoNotiBuilder.Build(sparseSurvivors, 2)[46] == 2,
                 ref failures);
 
@@ -1527,7 +1522,7 @@ namespace DfoServer.SelfTests
                 && soleSurvivor.Count == 1
                 && soleSurvivor.LeaderUserId == 12202
                 && soleSurvivor.GetMember(12202).SlotIndex == 1
-                && PartyInfoNotiBuilder.Build(soleSurvivor, 0)[62] == 1
+                && PartyInfoNotiBuilder.Build(soleSurvivor, 0)[57] == 1
                 && soleHostPackets.Length == 2
                 && BitConverter.ToUInt16(soleHostPackets[0], 1) == 0x001A
                 && soleHostPackets[0][15] == 1

@@ -5,10 +5,10 @@ using System.Linq;
 
 namespace DfoServer.Network.Builders.Party
 {
-    // PARTY_INFO (NOTI 0x0009), matched to the target A21 client's unpacked
-    // runtime parser at VA 0x01172000..0x011726B9:
+    // PARTY_INFO (NOTI 0x0009). 信息块按真机钩子(sub_14A4AA0)实证的 11 字节对齐:
     //   u16 blockCount; each block = u16 partyId + u8 type
-    //   type 0/1: info0; when info0==0, an empty raw dstr; then info1..info11
+    //   type 0/1: info0; when info0==0, an empty raw dstr; then 6 fixed bytes
+    //             (info1..info6) -> 11 bytes total, or 7 when info0!=0.
     //   type 0/2: 8 slots of { u16 uid; u8; u8; u8 }, then three tail bytes
     //   type <=2: u8 hasExtra; zero means no following u32-pair records
     public static class PartyInfoNotiBuilder
@@ -78,7 +78,9 @@ namespace DfoServer.Network.Builders.Party
                     // string branch and 0x0274FCB0 consumes a raw-dstr length.
                     w.WriteUInt32(0);
                 }
-                for (var i = 1; i < info.Length; i++)
+                // 真机钩子实证: dstr 之后只有 6 个定长字段, 共 11B(info0==0)。
+                // 多写会把名册整体后移, 客户端读到错位 uid 后闪退。
+                for (var i = 1; i <= 6; i++)
                     w.WriteByte(info[i]);
             }
 
