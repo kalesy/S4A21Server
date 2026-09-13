@@ -617,14 +617,10 @@ namespace DfoServer.Network.Handlers
 
             if (createdResult != null)
             {
-                await session.SendPacketAsync(GamePacketEnvelopeBuilder.Build(
-                    0x00,
-                    0x0009,
-                    PartyInfoNotiBuilder.Build(party, 0)));
-                await session.SendPacketAsync(GamePacketEnvelopeBuilder.Build(
-                    0x00,
-                    0x0099,
-                    PartyRealtimeInfoBuilder.Build(party)));
+                // 与 RES_PEER 已验证的 formation 时序保持一致:
+                // 实时(0x99) -> 端点(0x0B) -> 名册(0x0009 type0) -> 端点 -> 实时。
+                // 原先创建分支先发名册再发 0x99, 真机创建队伍会闪退。
+                await BroadcastPartyInfo(party, includeP2p: true);
             }
             else
             {
