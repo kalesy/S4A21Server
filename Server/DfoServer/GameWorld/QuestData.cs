@@ -72,28 +72,13 @@ namespace DfoServer.GameWorld
             return npcs.Contains(npcIndex);
         }
 
-        internal static bool IsDailyQuest(int questId)
+        public static bool IsRepeatableQuest(int questId)
         {
             var qst = GetQuestFile(questId);
-            return qst != null && IsDailyGrade(qst.Grade);
+            if (qst == null) return false;
+            var grade = (qst.Grade ?? "").Trim().ToLowerInvariant();
+            return grade == "[daily]" || grade == "[normaly repeat]" || grade == "[special daily]";
         }
-
-        internal static bool IsDailyGrade(string grade)
-        {
-            var normalized = NormalizeQuestTag(grade);
-            return normalized == "daily"
-                || normalized == "daily random"
-                || normalized == "special daily";
-        }
-
-        internal static bool IsImmediatelyRepeatableQuest(int questId)
-        {
-            var qst = GetQuestFile(questId);
-            return qst != null && IsImmediatelyRepeatableGrade(qst.Grade);
-        }
-
-        internal static bool IsImmediatelyRepeatableGrade(string grade)
-            => NormalizeQuestTag(grade) == "normaly repeat";
 
         internal static bool TryResolveCompletionDefinition(
             int questId,
@@ -123,7 +108,7 @@ namespace DfoServer.GameWorld
                 NormalizeQuestTag(quest.Grade),
                 NormalizeQuestTag(quest.Type),
                 quest.IntData,
-                IsImmediatelyRepeatableQuest(questId),
+                IsRepeatableQuest(questId),
                 rewardDefinition,
                 out definition,
                 out error);

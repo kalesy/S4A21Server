@@ -29,8 +29,7 @@ namespace DfoServer.Game.Quests
                 return QuestAcceptResult.Fail(0x17);
             }
 
-            var repeatable = GameWorld.QuestData.IsImmediatelyRepeatableQuest(questId);
-            var isDaily = GameWorld.QuestData.IsDailyQuest(questId);
+            var repeatable = GameWorld.QuestData.IsRepeatableQuest(questId);
             var eventItems = GameWorld.QuestData.GetEventItems(questId);
             var seekItems = GameWorld.QuestData.GetSeekingConsumeItems(questId);
             var eventSlots = new List<ushort>(eventItems.Count);
@@ -79,16 +78,8 @@ namespace DfoServer.Game.Quests
                         connection.Open();
                         using (var transaction = connection.BeginTransaction(deferred: false))
                         {
-                            var utcNow = DateTime.UtcNow;
                             if (!owner.IsCurrentInventoryOwner())
                                 return QuestAcceptResult.Fail(0x17);
-
-                            if (isDaily
-                                && DailyQuestCompletionCycle.GetCurrentCounter(
-                                    connection, transaction, characterId, questId, utcNow) > 0)
-                            {
-                                return QuestAcceptResult.Fail(18);
-                            }
 
                             var active = QuestRepository.LoadActiveQuests(
                                 connection,
@@ -208,7 +199,7 @@ namespace DfoServer.Game.Quests
                                 slot,
                                 questId,
                                 committedTrigger);
-                            if (repeatable || isDaily)
+                            if (repeatable)
                             {
                                 QuestRepository.DeleteClearedFlag(
                                     connection,
