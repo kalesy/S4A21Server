@@ -292,7 +292,7 @@ VALUES
                 var replay = service.HandleFinishQuest(owner, command);
                 Check("real FINISH rewards once and rejects replay",
                     first.Success && !replay.Success
-                    && inventory.CountMainItem(10093974) == 1
+                    && inventory.CountMainItem(10093974) == 100
                     && new QuestRepository(database.ConnectionString)
                         .IsQuestCleared(FinishCharacterId, DailyQuestId),
                     ref failures);
