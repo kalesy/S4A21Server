@@ -527,6 +527,9 @@ namespace DfoServer.SelfTests
             const int characterId = 298031;
             const short book5Slot = 65;
             const short book20Slot = 66;
+            const short tpBook1Slot = 67;
+            const short tpBook5Slot = 68;
+            const short tpBookFailSlot = 69;
             const byte level = 50;
             const byte job = 0;
             const byte growType = 0;
@@ -620,13 +623,31 @@ INSERT INTO character_subtype1_fields(character_id) VALUES (@cid);";
                         ExperienceItemUseService.SkillPointBook20ItemId,
                         ItemCreateReason.NpcShopPurchase,
                         1,
-                        out var book20))
+                        out var book20)
+                    || !InventoryCreateService.TryCreateCore(
+                        ExperienceItemUseService.TpSkillPointBook1ItemId,
+                        ItemCreateReason.NpcShopPurchase,
+                        1,
+                        out var tpBook1)
+                    || !InventoryCreateService.TryCreateCore(
+                        ExperienceItemUseService.TpSkillPointBook5ItemId,
+                        ItemCreateReason.NpcShopPurchase,
+                        1,
+                        out var tpBook5)
+                    || !InventoryCreateService.TryCreateCore(
+                        ExperienceItemUseService.TpSkillPointBook5ItemId,
+                        ItemCreateReason.NpcShopPurchase,
+                        1,
+                        out var tpBookFail))
                 {
                     throw new InvalidOperationException(
                         "failed to create real PVF skill-point books");
                 }
                 inventory.SetItem(InventoryListType.Main, book5Slot, book5);
                 inventory.SetItem(InventoryListType.Main, book20Slot, book20);
+                inventory.SetItem(InventoryListType.Main, tpBook1Slot, tpBook1);
+                inventory.SetItem(InventoryListType.Main, tpBook5Slot, tpBook5);
+                inventory.SetItem(InventoryListType.Main, tpBookFailSlot, tpBookFail);
                 lease = InventoryContext.Register(
                     session.SessionId,
                     characterId,
@@ -724,6 +745,78 @@ INSERT INTO character_subtype1_fields(character_id) VALUES (@cid);";
                         book20Slot) == null,
                     ref failures);
 
+                inventoryHandler.Handle_ENUM_CMDPACKET_INCREASE_STATUS(
+                        session,
+                        new GamePacketHeader(),
+                        BitConverter.GetBytes(tpBook1Slot))
+                    .GetAwaiter()
+                    .GetResult();
+                packets = capture.ReadPackets(minimumCount: 3);
+                var tpAck1 = packets.LastOrDefault(packet => IsPacket(
+                    packet,
+                    0x01,
+                    (ushort)CmdPacketType.INCREASE_STATUS));
+                var tpExp1 = packets.LastOrDefault(packet => IsPacket(
+                    packet,
+                    0x00,
+                    (ushort)NotiPacketTypeA21.EXP));
+                Check(
+                    "TP+1 book traverses the real INCREASE_STATUS handler and adds exactly 1 bonus TP to both pages",
+                    tpAck1 != null
+                    && tpAck1.Length >= 16
+                    && tpAck1[15] == 1
+                    && tpExp1 != null
+                    && ReadUInt16(tpExp1, 15 + 13)
+                        == initialProtocol.Page0Tp + 1
+                    && ReadUInt16(tpExp1, 15 + 15)
+                        == initialProtocol.Page1Tp + 1
+                    && ReadCharacterBonusTp(database, characterId) == 1
+                    && ReadMainSlotCount(
+                        database,
+                        characterId,
+                        accountId,
+                        tpBook1Slot) == 0
+                    && lease.Inventory.GetItem(
+                        InventoryListType.Main,
+                        tpBook1Slot) == null,
+                    ref failures);
+
+                inventoryHandler.Handle_ENUM_CMDPACKET_INCREASE_STATUS(
+                        session,
+                        new GamePacketHeader(),
+                        BitConverter.GetBytes(tpBook5Slot))
+                    .GetAwaiter()
+                    .GetResult();
+                packets = capture.ReadPackets(minimumCount: 3);
+                var tpAck5 = packets.LastOrDefault(packet => IsPacket(
+                    packet,
+                    0x01,
+                    (ushort)CmdPacketType.INCREASE_STATUS));
+                var tpExp5 = packets.LastOrDefault(packet => IsPacket(
+                    packet,
+                    0x00,
+                    (ushort)NotiPacketTypeA21.EXP));
+                Check(
+                    "TP+5 book adds exactly 5 more bonus TP and consumes its item through the same handler chain",
+                    tpAck5 != null
+                    && tpAck5.Length >= 16
+                    && tpAck5[15] == 1
+                    && tpExp5 != null
+                    && ReadUInt16(tpExp5, 15 + 13)
+                        == initialProtocol.Page0Tp + 6
+                    && ReadUInt16(tpExp5, 15 + 15)
+                        == initialProtocol.Page1Tp + 6
+                    && ReadCharacterBonusTp(database, characterId) == 6
+                    && ReadMainSlotCount(
+                        database,
+                        characterId,
+                        accountId,
+                        tpBook5Slot) == 0
+                    && lease.Inventory.GetItem(
+                        InventoryListType.Main,
+                        tpBook5Slot) == null,
+                    ref failures);
+
                 using (var connection = database.OpenConnection())
                 using (var command = connection.CreateCommand())
                 {
@@ -767,6 +860,50 @@ END;";
                     && lease.Inventory.GetItem(
                         InventoryListType.Main,
                         book5Slot)?.Count == 1,
+                    ref failures);
+
+                using (var connection = database.OpenConnection())
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = $@"
+CREATE TRIGGER fail_tp_skill_point_book_update
+BEFORE UPDATE OF bonus_tp ON characters
+WHEN OLD.character_id = {characterId}
+BEGIN
+    SELECT RAISE(ABORT, 'injected TP skill-point persistence failure');
+END;";
+                    command.ExecuteNonQuery();
+                }
+
+                inventoryHandler.Handle_ENUM_CMDPACKET_INCREASE_STATUS(
+                        session,
+                        new GamePacketHeader(),
+                        BitConverter.GetBytes(tpBookFailSlot))
+                    .GetAwaiter()
+                    .GetResult();
+                packets = capture.ReadPackets(minimumCount: 1);
+                var failedTpAck = packets.LastOrDefault(packet => IsPacket(
+                    packet,
+                    0x01,
+                    (ushort)CmdPacketType.INCREASE_STATUS));
+                Check(
+                    "TP book persistence failure returns an error and consumes nothing online or in SQLite",
+                    failedTpAck != null
+                    && failedTpAck.Length >= 17
+                    && failedTpAck[15] == 0
+                    && !packets.Any(packet => IsPacket(
+                        packet,
+                        0x00,
+                        (ushort)NotiPacketTypeA21.EXP))
+                    && ReadCharacterBonusTp(database, characterId) == 6
+                    && ReadMainSlotCount(
+                        database,
+                        characterId,
+                        accountId,
+                        tpBookFailSlot) == 1
+                    && lease.Inventory.GetItem(
+                        InventoryListType.Main,
+                        tpBookFailSlot)?.Count == 1,
                     ref failures);
             }
             catch (Exception ex)
@@ -1008,6 +1145,20 @@ INSERT INTO character_subtype1_fields(character_id) VALUES (@cid);";
             {
                 command.CommandText = @"
 SELECT bonus_sp FROM characters WHERE character_id = @cid;";
+                command.Parameters.AddWithValue("@cid", characterId);
+                return Convert.ToInt32(command.ExecuteScalar());
+            }
+        }
+
+        private static int ReadCharacterBonusTp(
+            GameDatabase database,
+            int characterId)
+        {
+            using (var connection = database.OpenConnection())
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT bonus_tp FROM characters WHERE character_id = @cid;";
                 command.Parameters.AddWithValue("@cid", characterId);
                 return Convert.ToInt32(command.ExecuteScalar());
             }

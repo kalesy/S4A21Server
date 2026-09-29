@@ -21,6 +21,8 @@ namespace DfoServer.Game.Inventory
         private const string LevelUpTicketActionType = "[level up ticket]";
         internal const int SkillPointBook5ItemId = 1031;
         internal const int SkillPointBook20ItemId = 1038;
+        internal const int TpSkillPointBook1ItemId = 1204;
+        internal const int TpSkillPointBook5ItemId = 1205;
 
         private readonly string _connectionString;
         private readonly IRentalTimeProvider _timeProvider;
@@ -168,7 +170,8 @@ namespace DfoServer.Game.Inventory
 
                     if (TryResolveSkillPointBook(
                             resolvedItemId,
-                            out var grantedSkillPoints))
+                            out var grantedSkillPoints,
+                            out var grantsTp))
                     {
                         return UseSkillPointBook(
                             lease,
@@ -178,7 +181,8 @@ namespace DfoServer.Game.Inventory
                             slotIndex,
                             sourceSnapshot,
                             resolvedItemId,
-                            grantedSkillPoints);
+                            grantedSkillPoints,
+                            grantsTp);
                     }
 
                     var definition = ExperienceItemDataProvider.Resolve(resolvedItemId);
@@ -471,7 +475,8 @@ namespace DfoServer.Game.Inventory
             short slotIndex,
             ItemCore sourceSnapshot,
             int resolvedItemId,
-            int grantedSkillPoints)
+            int grantedSkillPoints,
+            bool grantsTp)
         {
             var failureStatus = ExperienceItemUseStatus.PersistenceFailed;
             var failureDetail = "skill-point book transaction failed";
@@ -527,12 +532,27 @@ namespace DfoServer.Game.Inventory
                         return false;
                     }
 
-                    if (!_progressRepository.TryGrantBonusSp(
+                    var updatedBonusSp = character.BonusSp;
+                    var updatedBonusTp = character.BonusTp;
+                    if (grantsTp)
+                    {
+                        if (!_progressRepository.TryGrantBonusTp(
+                                connection,
+                                transaction,
+                                characterId,
+                                grantedSkillPoints,
+                                out updatedBonusTp))
+                        {
+                            failureDetail = "bonus TP persistence failed";
+                            return false;
+                        }
+                    }
+                    else if (!_progressRepository.TryGrantBonusSp(
                             connection,
                             transaction,
                             characterId,
                             grantedSkillPoints,
-                            out var updatedBonusSp))
+                            out updatedBonusSp))
                     {
                         failureDetail = "bonus SP persistence failed";
                         return false;
@@ -565,7 +585,7 @@ namespace DfoServer.Game.Inventory
                         character.Job,
                         character.Level,
                         updatedBonusSp,
-                        character.BonusTp,
+                        updatedBonusTp,
                         persist: true,
                         growType: firstGrow,
                         secondGrowType: secondGrow);
@@ -614,24 +634,41 @@ namespace DfoServer.Game.Inventory
                 SkillPoints = SkillStateService.GetProtocolState(
                     syncedSkills,
                     syncedPoints),
-                Detail = $"bonus SP +{grantedSkillPoints}",
+                Detail = grantsTp
+                    ? $"bonus TP +{grantedSkillPoints}"
+                    : $"bonus SP +{grantedSkillPoints}",
             };
         }
 
+        internal static bool IsSkillPointBookItem(int itemTemplateId)
+            => TryResolveSkillPointBook(itemTemplateId, out _, out _);
+
         private static bool TryResolveSkillPointBook(
             int itemTemplateId,
-            out int grantedSkillPoints)
+            out int grantedSkillPoints,
+            out bool grantsTp)
         {
             switch (itemTemplateId)
             {
                 case SkillPointBook5ItemId:
                     grantedSkillPoints = 5;
+                    grantsTp = false;
                     return true;
                 case SkillPointBook20ItemId:
                     grantedSkillPoints = 20;
+                    grantsTp = false;
+                    return true;
+                case TpSkillPointBook1ItemId:
+                    grantedSkillPoints = 1;
+                    grantsTp = true;
+                    return true;
+                case TpSkillPointBook5ItemId:
+                    grantedSkillPoints = 5;
+                    grantsTp = true;
                     return true;
                 default:
                     grantedSkillPoints = 0;
+                    grantsTp = false;
                     return false;
             }
         }

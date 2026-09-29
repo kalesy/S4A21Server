@@ -24,6 +24,8 @@ artifacts/
 
 # Runtime data
 *.pvf
+# 根目录的 Script.pvf 作为版本化的 PVF 数据源，随发布复制到 dist（见 publish.bat）。
+!/Script.pvf
 
 # OS
 .DS_Store

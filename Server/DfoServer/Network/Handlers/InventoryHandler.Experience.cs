@@ -131,10 +131,8 @@ namespace DfoServer.Network.Handlers
             if (result.UsableCountState != null)
                 await SendUsableCountLimitUpdateAsync(session, result.UsableCountState);
 
-            var useKind = result.ItemTemplateId
-                    == ExperienceItemUseService.SkillPointBook5ItemId
-                || result.ItemTemplateId
-                    == ExperienceItemUseService.SkillPointBook20ItemId
+            var useKind = ExperienceItemUseService.IsSkillPointBookItem(
+                    result.ItemTemplateId)
                 ? "skill-point"
                 : "experience";
             FileLogger.Log(

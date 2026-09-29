@@ -21,6 +21,17 @@ echo Publishing self-contained single-file build for %RID% -^> %OUT%
 if errorlevel 1 goto failed
 
 echo.
+echo Copying Script.pvf to %OUT%\Data\Pvf\...
+if not exist "%OUT%\Data\Pvf" mkdir "%OUT%\Data\Pvf"
+if exist "%~dp0Script.pvf" (
+  copy /Y "%~dp0Script.pvf" "%OUT%\Data\Pvf\Script.pvf" >nul
+  if errorlevel 1 goto failed
+  echo Copied Script.pvf.
+) else (
+  echo WARNING: Script.pvf not found at repo root; PVF copy skipped.
+)
+
+echo.
 echo Done. Run:
 echo   dist\%RID%\DfoServer.exe
 echo or double-click StartServer.exe after rebuilding it for dist\%RID%.
