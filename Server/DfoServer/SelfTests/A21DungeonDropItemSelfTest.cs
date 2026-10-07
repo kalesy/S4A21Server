@@ -625,17 +625,17 @@ INSERT INTO character_subtype1_fields(character_id) VALUES (@cid);";
                         1,
                         out var book20)
                     || !InventoryCreateService.TryCreateCore(
-                        ExperienceItemUseService.TpSkillPointBook1ItemId,
+                        ExperienceItemUseService.TpPointBook1ItemId,
                         ItemCreateReason.NpcShopPurchase,
                         1,
                         out var tpBook1)
                     || !InventoryCreateService.TryCreateCore(
-                        ExperienceItemUseService.TpSkillPointBook5ItemId,
+                        ExperienceItemUseService.TpPointBook5ItemId,
                         ItemCreateReason.NpcShopPurchase,
                         1,
                         out var tpBook5)
                     || !InventoryCreateService.TryCreateCore(
-                        ExperienceItemUseService.TpSkillPointBook5ItemId,
+                        ExperienceItemUseService.TpPointBook5ItemId,
                         ItemCreateReason.NpcShopPurchase,
                         1,
                         out var tpBookFail))
